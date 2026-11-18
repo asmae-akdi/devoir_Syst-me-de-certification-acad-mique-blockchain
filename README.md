@@ -80,9 +80,6 @@ Colonnes : `studentName`, `studentId`, `diplomaTitle`, `issueDate` (AAAA-MM-JJ),
 13 tests Hardhat : mint, event, accès restreint, admins, anti-doublon, batch
 (cas normal, tailles différentes, doublon), lecture, révocation.
 
-## Captures d'écran
-Voir le dossier `screenshots/`.
-
 ## Limites connues
 - Un étudiant ne peut avoir qu'un seul certificat (contrainte sur le studentId).
 - Les données sont publiques sur la blockchain : ne pas y mettre d'informations
