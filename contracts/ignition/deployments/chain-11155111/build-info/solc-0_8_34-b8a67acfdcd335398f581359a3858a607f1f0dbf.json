@@ -1,0 +1,50 @@
+{
+  "_format": "hh3-sol-build-info-1",
+  "id": "solc-0_8_34-b8a67acfdcd335398f581359a3858a607f1f0dbf",
+  "solcVersion": "0.8.34",
+  "solcLongVersion": "0.8.34+commit.80d5c536",
+  "compilerType": "solc",
+  "toolVersions": {
+    "hardhat": "3.22.0"
+  },
+  "userSourceNameMap": {
+    "contracts/CertificateRegistry.sol": "project/contracts/CertificateRegistry.sol"
+  },
+  "input": {
+    "language": "Solidity",
+    "settings": {
+      "evmVersion": "osaka",
+      "optimizer": {
+        "enabled": true,
+        "runs": 200
+      },
+      "outputSelection": {
+        "*": {
+          "": [
+            "ast"
+          ],
+          "*": [
+            "abi",
+            "evm.bytecode.linkReferences",
+            "evm.bytecode.object",
+            "evm.bytecode.opcodes",
+            "evm.bytecode.sourceMap",
+            "evm.deployedBytecode.immutableReferences",
+            "evm.deployedBytecode.linkReferences",
+            "evm.deployedBytecode.object",
+            "evm.deployedBytecode.opcodes",
+            "evm.deployedBytecode.sourceMap",
+            "evm.methodIdentifiers"
+          ]
+        }
+      },
+      "remappings": [],
+      "viaIR": true
+    },
+    "sources": {
+      "project/contracts/CertificateRegistry.sol": {
+        "content": "// SPDX-License-Identifier: MIT\r\npragma solidity ^0.8.20;\r\n\r\n/// @title CertificateRegistry\r\n/// @notice Registre de certificats académiques vérifiables sur la blockchain\r\ncontract CertificateRegistry {\r\n    // ---------- Données ----------\r\n\r\n    struct Certificate {\r\n        string studentName;\r\n        string studentId;\r\n        string diplomaTitle;\r\n        string issueDate;\r\n        string grade;\r\n        address recipient;\r\n        bool revoked;\r\n    }\r\n\r\n    address public owner;\r\n    uint256 public totalCertificates;\r\n\r\n    mapping(address => bool) public admins;\r\n    mapping(uint256 => Certificate) private certificates;\r\n    mapping(bytes32 => bool) private studentIdUsed;\r\n\r\n    // ---------- Événements ----------\r\n\r\n    event CertificateMinted(\r\n        uint256 indexed certId,\r\n        string studentId,\r\n        address indexed recipient\r\n    );\r\n    event CertificateRevoked(uint256 indexed certId);\r\n    event AdminUpdated(address indexed admin, bool isAdmin);\r\n\r\n    // ---------- Contrôle d'accès ----------\r\n\r\n    modifier onlyOwner() {\r\n        require(msg.sender == owner, \"Seul le owner peut faire ceci\");\r\n        _;\r\n    }\r\n\r\n    modifier onlyAdmin() {\r\n        require(\r\n            msg.sender == owner || admins[msg.sender],\r\n            \"Compte non autorise\"\r\n        );\r\n        _;\r\n    }\r\n\r\n    constructor() {\r\n        owner = msg.sender;\r\n    }\r\n\r\n    function setAdmin(address admin, bool isAdmin) external onlyOwner {\r\n        admins[admin] = isAdmin;\r\n        emit AdminUpdated(admin, isAdmin);\r\n    }\r\n\r\n    // ---------- Émission ----------\r\n\r\n    function mintCertificate(\r\n        address to,\r\n        string calldata studentName,\r\n        string calldata studentId,\r\n        string calldata diplomaTitle,\r\n        string calldata issueDate,\r\n        string calldata grade\r\n    ) external onlyAdmin returns (uint256 certId) {\r\n        certId = _mint(to, studentName, studentId, diplomaTitle, issueDate, grade);\r\n    }\r\n\r\n    function batchMint(\r\n        address[] calldata recipients,\r\n        string[] calldata studentNames,\r\n        string[] calldata studentIds,\r\n        string[] calldata diplomaTitles,\r\n        string[] calldata issueDates,\r\n        string[] calldata grades\r\n    ) external onlyAdmin {\r\n        uint256 n = recipients.length;\r\n        require(\r\n            studentNames.length == n &&\r\n                studentIds.length == n &&\r\n                diplomaTitles.length == n &&\r\n                issueDates.length == n &&\r\n                grades.length == n,\r\n            \"Tableaux de tailles differentes\"\r\n        );\r\n        require(n > 0, \"Lot vide\");\r\n\r\n        for (uint256 i = 0; i < n; i++) {\r\n            _mint(\r\n                recipients[i],\r\n                studentNames[i],\r\n                studentIds[i],\r\n                diplomaTitles[i],\r\n                issueDates[i],\r\n                grades[i]\r\n            );\r\n        }\r\n    }\r\n\r\n    function _mint(\r\n        address to,\r\n        string calldata studentName,\r\n        string calldata studentId,\r\n        string calldata diplomaTitle,\r\n        string calldata issueDate,\r\n        string calldata grade\r\n    ) internal returns (uint256 certId) {\r\n        require(bytes(studentId).length > 0, \"studentId vide\");\r\n        require(bytes(studentName).length > 0, \"studentName vide\");\r\n\r\n        bytes32 idHash = keccak256(bytes(studentId));\r\n        require(!studentIdUsed[idHash], \"studentId deja enregistre\");\r\n        studentIdUsed[idHash] = true;\r\n\r\n        totalCertificates++;\r\n        certId = totalCertificates;\r\n\r\n        certificates[certId] = Certificate({\r\n            studentName: studentName,\r\n            studentId: studentId,\r\n            diplomaTitle: diplomaTitle,\r\n            issueDate: issueDate,\r\n            grade: grade,\r\n            recipient: to,\r\n            revoked: false\r\n        });\r\n\r\n        emit CertificateMinted(certId, studentId, to);\r\n    }\r\n\r\n    // ---------- Révocation (optionnel) ----------\r\n\r\n    function revoke(uint256 certId) external onlyAdmin {\r\n        require(exists(certId), \"Certificat inexistant\");\r\n        require(!certificates[certId].revoked, \"Deja revoque\");\r\n        certificates[certId].revoked = true;\r\n        emit CertificateRevoked(certId);\r\n    }\r\n\r\n    // ---------- Lecture (gratuite) ----------\r\n\r\n    function exists(uint256 certId) public view returns (bool) {\r\n        return certId > 0 && certId <= totalCertificates;\r\n    }\r\n\r\n    function getCertificate(\r\n        uint256 certId\r\n    ) external view returns (Certificate memory) {\r\n        require(exists(certId), \"Certificat inexistant\");\r\n        return certificates[certId];\r\n    }\r\n\r\n    function isStudentRegistered(\r\n        string calldata studentId\r\n    ) external view returns (bool) {\r\n        return studentIdUsed[keccak256(bytes(studentId))];\r\n    }\r\n}"
+      }
+    }
+  }
+}
